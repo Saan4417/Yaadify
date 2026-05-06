@@ -1,0 +1,202 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user profile in Yaadify.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "User's email address."
+        },
+        "plan": {
+          "type": "string",
+          "description": "User's subscription plan, e.g. 'free' or 'premium'."
+        },
+        "streak": {
+          "type": "integer",
+          "description": "Current learning streak count."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        }
+      },
+      "required": ["email", "plan", "streak", "createdAt"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "A note from which flashcards are generated.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner of the note."
+        },
+        "content": {
+          "type": "string",
+          "description": "The actual text content of the note."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the note."
+        },
+        "source": {
+          "type": "string",
+          "description": "E.g., text, pdf, voice."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        }
+      },
+      "required": ["userId", "content", "title", "source", "createdAt"]
+    },
+    "Deck": {
+      "title": "Deck",
+      "description": "A deck that holds flashcards.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner of the deck."
+        },
+        "subject": {
+          "type": "string",
+          "description": "The subject or title of the deck."
+        },
+        "visibility": {
+          "type": "string",
+          "description": "E.g., public, private."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        }
+      },
+      "required": ["userId", "subject", "visibility", "createdAt"]
+    },
+    "Card": {
+      "title": "Card",
+      "description": "A flashcard generated from a note.",
+      "type": "object",
+      "properties": {
+        "deckId": {
+          "type": "string",
+          "description": "The deck this card belongs to."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The owner of the card."
+        },
+        "noteId": {
+          "type": "string",
+          "description": "The associated note."
+        },
+        "type": {
+          "type": "string",
+          "description": "E.g., qa or cloze."
+        },
+        "question": {
+          "type": "string",
+          "description": "The question or cloze text."
+        },
+        "answer": {
+          "type": "string",
+          "description": "The answer."
+        },
+        "easeFactor": {
+          "type": "number",
+          "description": "Spaced repetition ease factor."
+        },
+        "interval": {
+          "type": "number",
+          "description": "Current interval in days."
+        },
+        "repetitions": {
+          "type": "integer",
+          "description": "Number of successful repetitions."
+        },
+        "nextReview": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When to review next."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time created."
+        }
+      },
+      "required": ["deckId", "userId", "noteId", "type", "question", "answer", "easeFactor", "interval", "repetitions", "nextReview", "createdAt"]
+    },
+    "ReviewLog": {
+      "title": "ReviewLog",
+      "description": "Log of a user review.",
+      "type": "object",
+      "properties": {
+        "cardId": {
+          "type": "string",
+          "description": "Reviewed card."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The user who reviewed."
+        },
+        "deckId": {
+          "type": "string",
+          "description": "The deck this card belongs to."
+        },
+        "rating": {
+          "type": "string",
+          "description": "Again, Hard, Good, Easy."
+        },
+        "timeSpent": {
+          "type": "number",
+          "description": "Time spent in seconds."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Review time."
+        }
+      },
+      "required": ["cardId", "userId", "deckId", "rating", "timeSpent", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Contains user profiles."
+    },
+    "/notes/{noteId}": {
+      "schema": {
+        "$ref": "#/entities/Note"
+      },
+      "description": "Contains all raw notes."
+    },
+    "/decks/{deckId}": {
+      "schema": {
+        "$ref": "#/entities/Deck"
+      },
+      "description": "Contains decks holding flashcards."
+    },
+    "/cards/{cardId}": {
+      "schema": {
+        "$ref": "#/entities/Card"
+      },
+      "description": "Contains flashcards."
+    },
+    "/reviewLogs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/ReviewLog"
+      },
+      "description": "Logs of user reviews."
+    }
+  }
+}

@@ -1,0 +1,157 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitives
+    function isSignedIn() { return request.auth != null; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // Auth requirement
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+
+    // User Validation
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'plan', 'streak', 'createdAt']) && 
+             data.email is string && data.email.size() <= 200 &&
+             data.plan is string && data.plan.size() <= 50 &&
+             data.streak is number &&
+             data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                   isValidUser(incoming()) &&
+                   incoming().keys().size() == 4 &&
+                   incoming().createdAt == request.time;
+      allow update: if isOwner(userId) &&
+                   isValidUser(incoming()) &&
+                   incoming().diff(existing()).affectedKeys().hasOnly(['plan', 'streak']) &&
+                   incoming().createdAt == existing().createdAt &&
+                   incoming().email == existing().email;
+    }
+
+    // Note Validation
+    function isValidNote(data) {
+      return data.keys().hasAll(['userId', 'content', 'title', 'source', 'createdAt']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.content is string && data.content.size() <= 10000 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.source is string && data.source.size() <= 100 &&
+             data.createdAt is timestamp;
+    }
+
+    match /notes/{noteId} {
+      allow get: if isValidId(noteId) && isOwner(existing().userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isValidId(noteId) && isOwner(existing().userId);
+      allow create: if isValidId(noteId) &&
+                   isOwner(incoming().userId) &&
+                   isValidNote(incoming()) &&
+                   incoming().keys().size() == 5 &&
+                   incoming().createdAt == request.time &&
+                   exists(/databases/$(database)/documents/users/$(incoming().userId));
+      allow update: if isValidId(noteId) &&
+                   isOwner(existing().userId) &&
+                   isValidNote(incoming()) &&
+                   incoming().diff(existing()).affectedKeys().hasOnly(['content', 'title']) &&
+                   incoming().userId == existing().userId &&
+                   incoming().createdAt == existing().createdAt;
+    }
+
+    // Deck Validation
+    function isValidDeck(data) {
+      return data.keys().hasAll(['userId', 'subject', 'visibility', 'createdAt']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.subject is string && data.subject.size() <= 200 &&
+             data.visibility is string && data.visibility.size() <= 50 &&
+             data.createdAt is timestamp;
+    }
+
+    match /decks/{deckId} {
+      allow get: if isValidId(deckId) && isOwner(existing().userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isValidId(deckId) && isOwner(existing().userId);
+      allow create: if isValidId(deckId) &&
+                   isOwner(incoming().userId) &&
+                   isValidDeck(incoming()) &&
+                   incoming().keys().size() == 4 &&
+                   incoming().createdAt == request.time &&
+                   exists(/databases/$(database)/documents/users/$(incoming().userId));
+      allow update: if isValidId(deckId) &&
+                   isOwner(existing().userId) &&
+                   isValidDeck(incoming()) &&
+                   incoming().diff(existing()).affectedKeys().hasOnly(['subject', 'visibility']) &&
+                   incoming().userId == existing().userId &&
+                   incoming().createdAt == existing().createdAt;
+    }
+
+    // Card Validation
+    function isValidCard(data) {
+      return data.keys().hasAll(['deckId', 'userId', 'noteId', 'type', 'question', 'answer', 'easeFactor', 'interval', 'repetitions', 'nextReview', 'createdAt']) &&
+             data.deckId is string && data.deckId.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.noteId is string && data.noteId.size() <= 128 &&
+             data.type is string && data.type.size() <= 50 &&
+             data.question is string && data.question.size() <= 1000 &&
+             data.answer is string && data.answer.size() <= 1000 &&
+             data.easeFactor is number &&
+             data.interval is number &&
+             data.repetitions is number &&
+             data.nextReview is timestamp &&
+             data.createdAt is timestamp;
+    }
+
+    match /cards/{cardId} {
+      allow get: if isValidId(cardId) && isOwner(existing().userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isValidId(cardId) && isOwner(existing().userId);
+      allow create: if isValidId(cardId) &&
+                   isOwner(incoming().userId) &&
+                   isValidCard(incoming()) &&
+                   incoming().keys().size() == 11 &&
+                   incoming().createdAt == request.time &&
+                   exists(/databases/$(database)/documents/users/$(incoming().userId)) &&
+                   exists(/databases/$(database)/documents/decks/$(incoming().deckId));
+      allow update: if isValidId(cardId) &&
+                   isOwner(existing().userId) &&
+                   isValidCard(incoming()) &&
+                   // Allow updating Spaced Repetition stats, or basic content
+                   incoming().diff(existing()).affectedKeys().hasOnly(['type', 'question', 'answer', 'easeFactor', 'interval', 'repetitions', 'nextReview']) &&
+                   incoming().userId == existing().userId &&
+                   incoming().deckId == existing().deckId &&
+                   incoming().noteId == existing().noteId &&
+                   incoming().createdAt == existing().createdAt;
+    }
+
+    // ReviewLog Validation
+    function isValidReviewLog(data) {
+      return data.keys().hasAll(['cardId', 'userId', 'deckId', 'rating', 'timeSpent', 'createdAt']) &&
+             data.cardId is string && data.cardId.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.deckId is string && data.deckId.size() <= 128 &&
+             data.rating is string && data.rating.size() <= 50 &&
+             data.timeSpent is number &&
+             data.createdAt is timestamp;
+    }
+
+    match /reviewLogs/{logId} {
+      allow get: if isValidId(logId) && isOwner(existing().userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isValidId(logId) &&
+                   isOwner(incoming().userId) &&
+                   isValidReviewLog(incoming()) &&
+                   incoming().keys().size() == 6 &&
+                   incoming().createdAt == request.time &&
+                   exists(/databases/$(database)/documents/users/$(incoming().userId)) &&
+                   exists(/databases/$(database)/documents/cards/$(incoming().cardId));
+      // No update or delete allowed for logs
+    }
+  }
+}
